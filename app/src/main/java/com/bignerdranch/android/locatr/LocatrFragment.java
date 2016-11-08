@@ -22,6 +22,16 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,12 +39,14 @@ import java.util.List;
 /**
  * Created by sredorta on 11/8/2016.
  */
-public class LocatrFragment extends Fragment {
-    private ImageView mImageView;
+public class LocatrFragment extends SupportMapFragment {
     // Create client for google API
     private GoogleApiClient mClient;
-
     private ProgressDialog mProgressDialog;
+    private Bitmap mMapImage;
+    private GalleryItem mMapItem;
+    private Location mCurrentLocation;
+    private GoogleMap mMap;
 
 
     public static LocatrFragment newInstance() {
@@ -65,15 +77,16 @@ public class LocatrFragment extends Fragment {
                     }
                 })
                 .build();
+        getMapAsync(new OnMapReadyCallback() {
+            @Override
+            public void onMapReady(GoogleMap googleMap) {
+                mMap = googleMap;
+                updateUI();
+            }
+        });
     }
 
-    @Nullable
-    @Override
-    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_locatr,container,false);
-        mImageView = (ImageView) v.findViewById(R.id.image);
-        return v;
-    }
+
 
     //Connect the Google API client during onStart
     @Override
@@ -121,24 +134,57 @@ public class LocatrFragment extends Fragment {
                 .requestLocationUpdates(mClient, request, new LocationListener() {
                     @Override
                     public void onLocationChanged(Location location) {
-                        //Toast.makeText(getActivity(),"Got a fix:" + location,Toast.LENGTH_LONG).show();
+                        Toast.makeText(getActivity(),"Got current location:" + location,Toast.LENGTH_LONG).show();
                         new SearchTask().execute(location);
                     }
                 });
     }
 
+    private void updateUI() {
+        if (mMap == null || mMapImage == null) {
+            return;
+        }
+        LatLng itemPoint = new LatLng(mMapItem.getLat(),mMapItem.getLon());
+        LatLng myPoint   = new LatLng(mCurrentLocation.getLatitude(),mCurrentLocation.getLongitude());
+//        Toast.makeText(getActivity(),"item \nlat: " + mMapItem.getLat() + "\nlon: " + mMapItem.getLon(), Toast.LENGTH_LONG).show();
+//        Toast.makeText(getActivity(),"curr\n lat: " + mCurrentLocation.getLatitude() + "\nlon: " + mCurrentLocation.getLongitude(), Toast.LENGTH_LONG).show();
+        //Add markers on the two points
+        BitmapDescriptor itemBitmap = BitmapDescriptorFactory.fromBitmap(mMapImage);
+        MarkerOptions itemMarker = new MarkerOptions()
+                .position(itemPoint)
+                .icon(itemBitmap)
+                .zIndex(10);
+        MarkerOptions myMarker = new MarkerOptions()
+                .position(myPoint);
+        mMap.clear();
+        mMap.addMarker(itemMarker);
+        mMap.addMarker(myMarker);
+        LatLngBounds bounds = new LatLngBounds.Builder()
+                .include(itemPoint)
+                .include(myPoint)
+                .build();
+        //int margin = getResources().getDimensionPixelSize(R.dimen.map_intersect_margin);
+        CameraUpdate update = CameraUpdateFactory.newLatLngBounds(bounds,0);
+        mMap.animateCamera(update);
+
+    }
+
     private class SearchTask extends AsyncTask<Location,Void,Void> {
         private GalleryItem mGalleryItem;
         private Bitmap mBitmap;
+        private Location mLocation;
+
 
         @Override
         protected Void doInBackground(Location... params) {
+            mLocation = params[0];
             FlickrFetchr fetchr = new FlickrFetchr();
             List<GalleryItem> items = fetchr.searchPhotos(params[0]);
             if (items.size() == 0) {
                 return null;
             } else {
                 mGalleryItem = items.get(0);
+ //               Toast.makeText(getActivity(),"Current Geo field is:\n" + "Lat : " + mGalleryItem.getLat() + "\nLon : " +mGalleryItem.getLon() , Toast.LENGTH_LONG).show();
                 try {
                     byte[] bytes = fetchr.getURLBytes(mGalleryItem.getUrl());
                     mBitmap = BitmapFactory.decodeByteArray(bytes,0,bytes.length);
@@ -151,8 +197,11 @@ public class LocatrFragment extends Fragment {
 
         @Override
         protected void onPostExecute(Void result) {
-            mImageView.setImageBitmap(mBitmap);
             mProgressDialog.cancel();
+            mMapImage = mBitmap;
+            mMapItem = mGalleryItem;
+            mCurrentLocation = mLocation;
+            updateUI();
         }
     }
 }

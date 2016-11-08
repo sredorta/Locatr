@@ -1,6 +1,7 @@
 package com.bignerdranch.android.locatr;
 
 import android.net.Uri;
+import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -23,10 +24,33 @@ public class GalleryItem {
     @SerializedName("owner")
     private String mOwner;
 
+
+    @SerializedName("latitude")
+    private String mLat;
+
+    @SerializedName("longitude")
+    private String mLon;
+
+    public double getLat() {
+        return Double.parseDouble(mLat);
+    }
+    public void setLat(String lat) {
+        mLat = lat;
+    }
+    public double getLon() {
+        return Double.parseDouble(mLon);
+    }
+    public void setLon(String lon) {
+        mLon = lon;
+    }
+
+
+
     @Override
     public String toString() {
         return mCaption;
     }
+
 
     public String getCaption() {
         return mCaption;
@@ -73,6 +97,9 @@ public class GalleryItem {
     public static GalleryItem parseJSON(String response) {
         Gson gson = new GsonBuilder().create();
         GalleryItem itemResponse = gson.fromJson(response, GalleryItem.class);
+
+       // itemResponse.setLat(mGeo);
+       // itemResponse.setLon()
         return itemResponse;
     }
 
